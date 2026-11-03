@@ -1,0 +1,17 @@
+name = "parseit-lemmas"
+lintDriver = "batteries/runLinter"
+defaultTargets = ["ParseIt-Lemmas"]
+
+[[require]]
+name = "batteries"
+git = "https://github.com/leanprover-community/batteries"
+rev = "v4.36.0-rc2"
+
+[[require]]
+name = "ParseIt"
+git = "https://github.com/bergmannjg/lean4-parseit"
+rev = "expose-defs"
+
+[[lean_lib]]
+name = "ParseIt-Lemmas"
+roots = ["Lemmas"]
