@@ -39,6 +39,43 @@ theorem Progress.eq_refl [Iterators.Finite ι Id] {it : Iter (α := ι) τ} (p :
   | stay => rfl
   | moved h => exact absurd h (Advanced.irrefl it)
 
+/-- For finite iterators, composing a `Progress` proof with a self-progress is a no-op. -/
+theorem Progress.trans_self [Iterators.Finite ι Id] {it' it : Iter (α := ι) τ}
+  (h : Progress it' it) (h' : Progress it it) : h.trans h' = h := by
+  rw [Progress.eq_refl h', Progress.refl_eq, Progress.trans_refl']
+
+/-- A spec for `x` started at the parse start `it` also holds when `x` is started at `it` with an
+arbitrary parse start `it₀`, as long as the postcondition only depends on the current iterator. -/
+theorem Spec.from_start {x : Parser ε ι τ α} {Q : α → Iter (α := ι) τ → Prop}
+  {E : ε → Prop} (it₀ it : Iter (α := ι) τ)
+  (h : Triple x (fun s => s.it = it ∧ s.rest = it) (fun a s => s.it = it ∧ Q a s.rest) E)
+    : Triple x (fun s => s.it = it₀ ∧ s.rest = it) (fun a s => s.it = it₀ ∧ Q a s.rest) E :=
+   Triple.intro (by
+    have := Parser.of_wp_eq _ h it (by simp [IterWithProgress.refl])
+    simp only [Order.PartialOrder.rel, WP.wp, WP.trans, Parser.run]
+    rintro s ⟨hit, rfl⟩
+    revert this
+    generalize x s.rest = r
+    cases r <;> simp_all)
+
+/-- Any `x` started at `it` (with parse start `it₀`) never moves backwards from `it`. -/
+theorem Spec.progress
+  (x : Parser ε ι τ α) (it₀ it : Iter (α := ι) τ)
+    : Triple x
+      (fun s => s.it = it₀ ∧ s.rest = it)
+      (fun _ s => s.it = it₀ ∧ (s.rest = it ∨ Advanced s.rest it))
+      (fun _ => True) :=
+  Triple.intro (by
+    rintro ⟨s⟩ ⟨h1, rfl⟩
+    simp only [wp, WP.trans, pushResult]
+    split
+    next _ _ hp _ _ =>
+      refine ⟨h1, ?_⟩
+      cases hp with
+      | stay h => exact .inl h
+      | moved h => exact .inr h
+    · trivial)
+
 /-- Generic specification of an arbitrary parser `x` started at `it`: on success the final state is
 exactly what `x it` returns, and on failure the error is the one `x it` returns. -/
 theorem Spec.default_parser [Iterators.Finite ι Id]
