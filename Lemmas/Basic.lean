@@ -4,7 +4,6 @@ public import Init.Meta
 
 import all ParseIt.Error
 import all ParseIt.Basic
-public import ParseIt
 
 public import Std.Tactic.Do
 public import Std.Tactic.Do.Syntax
@@ -24,25 +23,12 @@ namespace ParseIt
 
 variable {ε ι τ α β : Type u} [Iterator ι Id τ]
 
-/-- `Advanced` is irreflexive for finite iterators: an iterator never strictly advances past itself. -/
-@[simp, grind .] theorem Advanced.irrefl [Iterators.Finite ι Id] (it : Iter (α := ι) τ)
-    : ¬ Advanced it it := by
-  have key : ∀ a, Acc (IterM.TerminationMeasures.Finite.Rel (α := ι) (m := Id)) a →
-      ¬ IterM.TerminationMeasures.Finite.Rel a a :=
-    fun a ha => ha.rec (fun x _ ih hx => ih x hx hx)
-  exact key _ ((inferInstance : WellFoundedRelation (IterM.TerminationMeasures.Finite ι Id)).wf.apply _)
-
 /-- For finite iterators, the only `Progress` proof from an iterator to itself is `Progress.refl`. -/
 theorem Progress.eq_refl [Iterators.Finite ι Id] {it : Iter (α := ι) τ} (p : Progress it it) :
     p = Progress.refl it := by
   cases p with
   | stay => rfl
   | moved h => exact absurd h (Advanced.irrefl it)
-
-/-- For finite iterators, composing a `Progress` proof with a self-progress is a no-op. -/
-theorem Progress.trans_self [Iterators.Finite ι Id] {it' it : Iter (α := ι) τ}
-  (h : Progress it' it) (h' : Progress it it) : h.trans h' = h := by
-  rw [Progress.eq_refl h', Progress.refl_eq, Progress.trans_refl']
 
 /-- A spec for `x` started at the parse start `it` also holds when `x` is started at `it` with an
 arbitrary parse start `it₀`, as long as the postcondition only depends on the current iterator. -/
@@ -75,6 +61,39 @@ theorem Spec.progress
       | stay h => exact .inl h
       | moved h => exact .inr h
     · trivial)
+
+/-- `optionD x default` never fails: it returns the result of `x` if `x` succeeds, and `default`
+without consuming input otherwise. -/
+public theorem optionD_of_eq
+  (x : Parser ε ι τ α) (default : α) (it : Iter (α := ι) τ) {r}
+  (h : (ParseIt.optionD x default : Parser ε ι τ α) it = r)
+    : (∃ (it' : Iter (α := ι) τ) (a : α) (p : Progress it' it), r = .ok it' p a ∧ x it = .ok it' p a)
+      ∨ (∃ e : ε, r = .ok it (.refl it) default ∧ x it = .error e) := by
+  subst h
+  simp only [ParseIt.optionD, ParseIt.eoption, bind, pure]
+  cases x it with
+  | ok rest p a => exact .inl ⟨rest, a, p, by
+      have : Progress.refl rest = .stay rfl := rfl
+      have : (Progress.stay rfl : Progress rest rest).trans p = p := by cases p <;> rfl
+      simp [*], rfl⟩
+  | error e => exact .inr ⟨e, rfl, rfl⟩
+
+/-- `optionD x default` never fails: it returns the result of `x` if `x` succeeds, otherwise none
+without consuming input otherwise. -/
+public theorem option?_of_eq
+  (x : Parser ε ι τ α) (it : Iter (α := ι) τ) {r}
+  (h : (ParseIt.option? x : Parser ε ι τ (Option α)) it = r)
+    : (∃ (it' : Iter (α := ι) τ) (a : α) (p : Progress it' it), r = .ok it' p (some a) ∧ x it = .ok it' p a)
+      ∨ (∃ e : ε, r = .ok it (.refl it) none ∧ x it = .error e) := by
+  rcases optionD_of_eq (some <$> x) none it h with ⟨it', a, p, hr, hx⟩ | ⟨e, hr, hx⟩
+  · simp only [Functor.map, bind, pure] at hx
+    split at hx <;> cases hx
+    rename_i a' p' hxa
+    have : (Progress.refl it').trans p' = p' := by cases p' <;> rfl
+    exact .inl ⟨it', a', p', by rw [hr, this], hxa⟩
+  · simp only [Functor.map, bind, pure] at hx
+    split at hx <;> cases hx
+    exact .inr ⟨_, hr, by assumption⟩
 
 /-- Generic specification of an arbitrary parser `x` started at `it`: on success the final state is
 exactly what `x it` returns, and on failure the error is the one `x it` returns. -/
@@ -284,22 +303,6 @@ fails with `Error.unexpected it none`. -/
     | ok rest h a => simpa using ⟨rest, h, a, rfl⟩
     | error e => simpa [hit] using ⟨e, rfl⟩)
 
-/-- `eoption x` never fails: it returns `.inl v` (after the input consumed by `x`) if `x` succeeds
-with `v`, and `.inr e` without consuming input if `x` fails with `e`. -/
-@[spec] theorem Spec.eoption (x : Parser ε ι τ α)  (it : Iter (α := ι) τ)
-    : Triple (ParseIt.eoption x : Parser ε ι τ (Sum α ε))
-      (fun s => s.it = it ∧ s.rest = it)
-      (fun (a : Sum α ε) (s : IterWithProgress ι τ) =>
-          match x it with
-          | .ok rest _ v =>  s.it = it ∧ s.rest = rest ∧ a = .inl v
-          | .error e => s.it = it ∧ s.rest = it ∧ a = .inr e)
-      (fun _ => False) :=
-   Triple.intro (by
-    simp only [Order.PartialOrder.rel, WP.wp, WP.trans, Parser.run]
-    rintro s ⟨hit, rfl⟩
-    simp only [ParseIt.eoption, bind, pure]
-    cases x s.rest <;> simp [hit])
-
 /-- `optionD x default` never fails: it returns the result of `x` if `x` succeeds, and `default`
 without consuming input otherwise. -/
 @[spec] theorem Spec.optionD (x : Parser ε ι τ α) (default : α) (it : Iter (α := ι) τ)
@@ -309,8 +312,15 @@ without consuming input otherwise. -/
           match x it with
           | .ok rest _ v => s.it = it ∧ s.rest = rest ∧ a = v
           | .error _ => s.it = it ∧ s.rest = it ∧ a = default)
-      (fun _ => False) := by
-  vcgen [ParseIt.optionD] with try finish
+      (fun _ => False) :=
+  Triple.intro (by
+    simp only [Order.PartialOrder.rel, WP.wp, WP.trans, Parser.run]
+    rintro ⟨sit, srest, sp⟩ ⟨hit, hrest⟩
+    dsimp only at hit hrest ⊢
+    subst hit hrest
+    generalize hr : (ParseIt.optionD x default : Parser ε ι τ α) srest = r
+    rcases optionD_of_eq x default srest hr with ⟨it', a, p, rfl, hx⟩ | ⟨e, rfl, hx⟩ <;>
+      simp [pushResult, hx])
 
 /-- `option! x` never fails: it returns the result of `x` if `x` succeeds, and the `Inhabited`
 default without consuming input otherwise. -/

@@ -4,7 +4,6 @@ public import Init.Meta
 
 import all ParseIt.Error
 import all ParseIt.Basic
-import ParseIt.Combinators
 import all ParseIt.Char.Basic
 
 public import Std.Tactic.Do
@@ -43,6 +42,7 @@ with an `unexpected` error annotated with `expected c`. -/
   grind
 
 omit [Iterators.Productive ι Id] in
+omit [Iterators.Finite ι Id] in
 /-- If every step `f c` either yields while consuming input or fails with an `unexpected` error,
 then `forIn l` over `f` consumes input whenever `l` is non-empty, and any failure is an
 `unexpected` error. -/

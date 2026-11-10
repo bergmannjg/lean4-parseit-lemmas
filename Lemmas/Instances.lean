@@ -18,20 +18,31 @@ namespace ParseIt
 
 variable {ε ι τ α : Type u} [Iterator ι Id τ]
 
+public theorem Advanced.irrefl [Iterators.Finite ι Id] (it : Iter (α := ι) τ)
+   : ¬ Advanced it it := by
+  have key : ∀ a, Acc (IterM.TerminationMeasures.Finite.Rel (α := ι) (m := Id)) a →
+      ¬ IterM.TerminationMeasures.Finite.Rel a a :=
+    fun a ha => ha.rec (fun x _ ih hx => ih x hx hx)
+  exact key _ ((inferInstance : WellFoundedRelation (IterM.TerminationMeasures.Finite ι Id)).wf.apply _)
+
+namespace Progress
+
 /-- `Progress.refl` is the `stay` constructor. -/
-@[simp] theorem Progress.refl_eq {it : Iter (α := ι) τ}
+@[simp, grind .] public theorem refl_eq {it : Iter (α := ι) τ}
     : Progress.refl it = .stay rfl  := by
   rfl
 
 /-- `Progress.stay rfl` is a left identity for `Progress.trans`. -/
-@[simp, grind .] theorem Progress.refl_trans' {it' it : Iter (α := ι) τ} (h : Progress it' it) :
+@[simp, grind .] public theorem refl_trans' {it' it : Iter (α := ι) τ} (h : Progress it' it) :
     (Progress.stay rfl : Progress it' it').trans h = h := by
   cases h <;> rfl
 
 /-- `Progress.stay rfl` is a right identity for `Progress.trans`. -/
-@[simp, grind .] theorem Progress.trans_refl' {it' it : Iter (α := ι) τ} (h : Progress it' it) :
+@[simp, grind .] public theorem trans_refl' {it' it : Iter (α := ι) τ} (h : Progress it' it) :
     h.trans (Progress.stay rfl : Progress it it) = h := by
   cases h <;> rfl
+
+end Progress
 
 /-- `Progress.trans` is associative. -/
 @[simp, grind .] theorem Progress.trans_assoc' {it''' it'' it' it : Iter (α := ι) τ}

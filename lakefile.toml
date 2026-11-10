@@ -9,8 +9,8 @@ rev = "v4.36.0-rc2"
 
 [[require]]
 name = "ParseIt"
-git = "https://github.com/bergmannjg/lean4-parseit"
-rev = "expose-defs"
+git = "https://github.com/fgdorais/lean4-parseit"
+rev = "main"
 
 [[lean_lib]]
 name = "ParseIt-Lemmas"
