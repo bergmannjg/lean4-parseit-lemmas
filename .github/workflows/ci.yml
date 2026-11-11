@@ -33,3 +33,31 @@ jobs:
           lint: true
           test: false
           use-github-cache: false
+      - name: Build Doc
+              run: |
+                cd docbuild
+                lake update doc-gen4
+                lake build ParseIt-Lemmas:docs
+            - name: Setup Pages
+              uses: actions/configure-pages@v4
+            - name: Upload artifact
+              uses: actions/upload-pages-artifact@v3
+              with:
+                path: './docbuild/.lake/build/doc'
+
+  deploy:
+    needs: build
+
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
